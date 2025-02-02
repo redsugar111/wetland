@@ -1,0 +1,1107 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>湿地指标计算</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --bg-color: #e9ecf1;  /* 加深背景色 */
+            --sidebar-bg: #ffffff;
+            --card-bg: #ffffff;
+            --text-color: #4a5568;
+            --border-color: #e2e8f0;
+            --hover-color: #f7fafc;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(-20px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: var(--bg-color);
+            min-height: 100vh;
+            display: flex;
+            color: var(--text-color);
+        }
+
+        /* 左侧导航栏 */
+        .sidebar {
+            width: 280px;
+            margin: 48px 32px 32px 64px;  /* 增加左边距到 64px */
+            background: var(--sidebar-bg);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            border-radius: 16px;
+            padding: 24px 0;
+            height: calc(100vh - 80px);  /* 调整高度以适应新的边距 */
+            position: fixed;
+            display: flex;
+            flex-direction: column;
+            animation: slideIn 0.5s ease;
+        }
+
+        .sidebar-title {
+            padding: 0 32px 32px 32px;  /* 增加内边距 */
+            font-size: 24px;
+            font-weight: 600;  /* 加粗字体 */
+            color: var(--primary-color);
+            margin-bottom: 10px;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .nav-item {
+            margin: 8px 24px;  /* 增加左右边距 */
+            padding: 14px 20px;  /* 增加内边距 */
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            color: var(--text-color);
+            border-radius: 12px;
+            background: var(--bg-color);
+        }
+
+        .nav-item:hover {
+            background: var(--primary-color);
+            color: white;
+            transform: translateX(5px);
+        }
+
+        .nav-item.active {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .nav-item .icon {
+            margin-right: 12px;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .nav-item:hover .icon, 
+        .nav-item.active .icon {
+            opacity: 1;
+        }
+
+        /* 主内容区 */
+        .main-content {
+            margin: 48px 32px 32px 376px;  /* 调整左边距 (280px + 64px + 32px) */
+            padding: 0;
+            flex: 1;
+            max-width: 1000px;  /* 限制最大宽度 */
+            animation: fadeIn 0.5s ease;
+        }
+
+        .header {
+            margin-bottom: 32px;  /* 增加间距 */
+            padding: 32px;  /* 增加内边距 */
+            background: var(--card-bg);
+            border-radius: 16px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 32px;  /* 增大右侧标题字号 */
+            font-weight: 600;  /* 加粗字体 */
+            color: var(--primary-color);
+        }
+
+        .container {
+            background: var(--card-bg);
+            padding: 32px;  /* 增加内边距 */
+            border-radius: 16px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            margin-bottom: 32px;  /* 增加间距 */
+            transition: all 0.3s ease;
+        }
+
+        .container:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.08);
+        }
+
+        .section {
+            display: none;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.3s ease;
+        }
+
+        .section.active {
+            display: block;
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .input-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .input-wrapper {
+            flex: 1;
+        }
+
+        .info-tooltip {
+            margin-left: 8px;
+            flex-shrink: 0;  /* 防止图标被压缩 */
+            width: 24px;  /* 固定图标容器宽度 */
+            height: 24px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--primary-color);
+            cursor: help;
+        }
+
+        .info-tooltip .tooltip-text {
+            visibility: hidden;
+            position: absolute;
+            left: 50%;
+            top: -8px;
+            transform: translateX(-50%) translateY(-100%);
+            background-color: var(--primary-color);
+            color: white;
+            text-align: center;
+            padding: 8px 12px;
+            border-radius: 6px;
+            width: 200px;
+            font-size: 14px;
+            z-index: 1;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .info-tooltip:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        .info-tooltip .tooltip-text::before {
+            content: "";
+            position: absolute;
+            left: 50%;
+            bottom: -6px;
+            transform: translateX(-50%);
+            border-width: 6px;
+            border-style: solid;
+            border-color: var(--primary-color) transparent transparent transparent;
+        }
+
+        input[type="number"] {
+            flex: 1;
+            min-width: 0;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            margin: 12px 0;  /* 增加上下间距 */
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            text-align: center;
+            font-size: 14px;
+            box-sizing: border-box;
+            transition: all 0.3s ease;
+            background: var(--bg-color);
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(44, 62, 80, 0.1);
+            transform: translateY(-1px);
+        }
+
+        button {
+            width: 100%;
+            padding: 12px 24px;
+            background: var(--primary-color);
+            border: none;
+            color: white;
+            font-size: 16px;
+            font-weight: 500;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(44, 62, 80, 0.2);
+        }
+
+        .result {
+            margin-top: 24px;
+            padding: 24px;
+            background: var(--bg-color);
+            border-radius: 12px;
+            font-size: 14px;
+            line-height: 1.6;
+            background: white;  /* 改为白色背景 */
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            position: relative;
+        }
+
+        .error {
+            color: #e53e3e;
+            animation: fadeIn 0.3s ease;
+        }
+
+        h2 {
+            color: var(--primary-color);
+            font-size: 18px;
+            font-weight: 500;
+            margin-bottom: 20px;
+        }
+
+        .steps {
+            font-family: monospace;
+            margin-top: 10px;
+            line-height: 1.6;
+        }
+
+        /* 添加新的样式 */
+        .metrics-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 24px;
+        }
+
+        .metric-card {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            min-height: 150px;  /* 设置固定高度以保持一致性 */
+        }
+
+        .metric-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.08);
+        }
+
+        .metric-card canvas {
+            position: relative;
+            z-index: 1;
+        }
+
+        .metric-value {
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--primary-color);
+            margin-bottom: 8px;  /* 添加底部间距 */
+        }
+
+        .metric-label {
+            font-size: 14px;
+            color: var(--text-color);
+        }
+
+        .metric-status {
+            margin-top: 8px;
+            font-size: 14px;
+            color: var(--text-color);
+            font-weight: 500;
+        }
+
+        .metric-status::before {
+            content: "•";
+            font-weight: bold;
+            font-size: 18px;
+            margin-right: 4px;
+            vertical-align: middle;
+        }
+
+        /* 修改圆形容器样式 */
+        #siProgress-container, #dlProgress-container, #curvatureProgress-container {
+            width: 120px;
+            height: 120px;
+            margin: 0 auto 40px;  /* 增加底部边距，为下方文字留出空间 */
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* 修改 Canvas 样式 */
+        #siProgress, #dlProgress, #curvatureProgress {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100% !important;
+            height: 100% !important;
+            z-index: 1;
+        }
+
+        /* 修改数值显示样式 */
+        #siValue, #dlValue, #shorelineCurvature {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 2;
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+
+        /* 显示 Canvas */
+        #siProgress {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* 添加思维导图相关样式 */
+        .workflow-container {
+            background: var(--card-bg);
+            padding: 24px;
+            border-radius: 12px;
+            margin-top: 24px;
+            overflow: auto;
+        }
+
+        .mermaid {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+        }
+
+        /* 调整图表布局 */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-bottom: 24px;
+        }
+
+        /* 修改公式相关样式 */
+        .formula-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+        }
+
+        .formula-section h3 {
+            color: #2c3e50;
+            font-size: 18px;
+            margin-bottom: 16px;
+        }
+
+        .formula-list {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+        }
+
+        .formula-item {
+            background: white;
+            padding: 16px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            height: 100%;  /* 确保所有卡片高度一致 */
+        }
+
+        .formula-item p {
+            margin: 0 0 8px 0;
+            color: #4a5568;
+            font-weight: 500;
+        }
+
+        .math {
+            display: flex;
+            justify-content: center;
+            padding: 8px;
+            overflow-x: auto;
+        }
+
+        /* 添加分隔线样式 */
+        .section-divider {
+            border: none;
+            border-top: 2px dashed #e2e8f0;
+            margin: 32px 0;
+            width: 100%;
+        }
+
+        /* 调整计算过程的样式 */
+        .calculation-process {
+            padding: 20px;
+            border-radius: 12px;
+            margin-top: 32px;
+            position: relative;
+        }
+
+        /* 添加计算过程标题样式 */
+        .process-title {
+            position: absolute;
+            top: -10px;
+            left: 20px;
+            background: white;
+            padding: 0 10px;
+            color: var(--primary-color);
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .calculation-process .formula-item {
+            margin-bottom: 0;
+        }
+
+        /* 修改按钮容器样式 */
+        .button-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 16px;
+            width: 100%;  /* 使容器宽度与输入框一致 */
+        }
+
+        .button-container button {
+            flex: 1;  /* 让按钮占据除图标外的所有空间 */
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: 500;
+        }
+
+        .calculation-step {
+            background: white;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            border: 1px solid var(--border-color);
+        }
+
+        .calculation-step h4 {
+            margin: 0 0 12px 0;
+            color: var(--primary-color);
+            font-size: 16px;
+        }
+
+        .calculation-step p {
+            margin: 8px 0;
+            font-size: 15px;
+        }
+
+        .step-detail {
+            color: #666;
+            font-size: 14px;
+        }
+
+        /* 添加公式注释样式 */
+        .formula-note {
+            font-size: 12px;
+            color: #666;
+            margin-top: 8px;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <!-- 左侧导航栏 -->
+    <div class="sidebar">
+        <div class="sidebar-title">
+            湿地指标计算
+        </div>
+        <div class="nav-item active" onclick="switchSection('shape-index')">
+            <div class="icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <path d="M12 6v6l4 2"></path>
+                </svg>
+            </div>
+            形状指数计算
+        </div>
+        <div class="nav-item" onclick="switchSection('shoreline')">
+            <div class="icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"></path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                </svg>
+            </div>
+            丰盈岸线计算
+        </div>
+    </div>
+
+    <!-- 主内容区 -->
+    <div class="main-content">
+        <div class="header">
+            <h1>形状指数计算</h1>
+        </div>
+
+        <!-- 形状指数计算部分 -->
+        <div id="shape-index" class="section active">
+            <div class="container">
+                <h2>形状指数计算</h2>
+                
+                <div class="metrics-container">
+                    <div class="metric-card">
+                        <div id="siProgress-container">
+                            <canvas id="siProgress"></canvas>
+                            <div id="siValue">-</div>
+                        </div>
+                        <div class="metric-label">形状指数 (SI)</div>
+                        <div class="metric-status" id="siStatus">-</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="perimeter">-</div>
+                        <div class="metric-label">周长 (米)</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="area">-</div>
+                        <div class="metric-label">面积 (平方米)</div>
+                    </div>
+                </div>
+
+                <form id="calculate_shape_index" onsubmit="event.preventDefault(); calculateShapeIndex();">
+                    <div class="input-group">
+                        <input type="number" name="P" placeholder="周长 (P, 米)" step="0.01">
+                        <input type="number" name="A" placeholder="面积 (A, 平方米)" step="0.01">
+                        <input type="number" name="SI" placeholder="形状指数 (SI)" step="0.0001">
+                    </div>
+                    <button type="submit">计算</button>
+                </form>
+                <div class="result" id="shape-index-result"></div>
+                
+                <!-- 添加分隔线 -->
+                <hr class="section-divider">
+                
+                <!-- 添加计算公式说明 -->
+                <div class="formula-section">
+                    <h3>◆ 计算公式</h3>
+                    <div class="formula-list">
+                        <div class="formula-item">
+                            <p>1. 计算形状指数 (SI)</p>
+                            <div class="math">$$ SI = \frac{P}{2\sqrt{\pi A}} $$</div>
+                        </div>
+                        <div class="formula-item">
+                            <p>2. 计算周长 (P)</p>
+                            <div class="math">$$ P = SI \times 2\sqrt{\pi A} $$</div>
+                        </div>
+                        <div class="formula-item">
+                            <p>3. 计算面积 (A)</p>
+                            <div class="math">$$ A = \left(\frac{P}{2SI}\right)^2 \div \pi $$</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 丰盈岸线计算部分 -->
+        <div id="shoreline" class="section">
+            <div class="container">
+                <h2>丰盈岸线计算</h2>
+                <div class="metrics-container">
+                    <div class="metric-card">
+                        <div id="dlProgress-container">
+                            <canvas id="dlProgress"></canvas>
+                            <div id="dlValue">-</div>
+                        </div>
+                        <div class="metric-label">岸线发育系数</div>
+                        <div class="metric-status" id="dlStatus">-</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="fractalDimension">-</div>
+                        <div class="metric-label">分形维数</div>
+                    </div>
+                    <div class="metric-card">
+                        <div id="curvatureProgress-container">
+                            <canvas id="curvatureProgress"></canvas>
+                            <div id="shorelineCurvature">-</div>
+                        </div>
+                        <div class="metric-label">岸线曲率</div>
+                        <div class="metric-status" id="curvatureStatus">-</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="shorelineDensity">-</div>
+                        <div class="metric-label">岸线密度</div>
+                    </div>
+                </div>
+
+                <form id="calculate_rich_shoreline" onsubmit="event.preventDefault(); calculateShoreline();">
+                    <div class="input-group">
+                        <div class="input-container">
+                            <div class="input-wrapper">
+                                <input type="number" name="P" placeholder="周长 (P, 米)" step="0.01">
+                            </div>
+                        </div>
+                        <div class="input-container">
+                            <div class="input-wrapper">
+                                <input type="number" name="L" placeholder="岸线实际长度 (L, 米)" step="0.01">
+                            </div>
+                        </div>
+                        <div class="input-container">
+                            <div class="input-wrapper">
+                                <input type="number" name="L0" placeholder="最长轴 (L0, 米) - 湿地最长的直线距离" step="0.01">
+                            </div>
+                        </div>
+                        <div class="input-container">
+                            <div class="input-wrapper">
+                                <input type="number" name="A" placeholder="面积 (A, 平方米)" step="0.01">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="button-container">
+                        <button type="submit">计算</button>
+                        <div class="info-tooltip">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <path d="M12 16v-4M12 8h.01"></path>
+                            </svg>
+                            <span class="tooltip-text">对于岛屿情况，周长(P)等于岸线实际长度(L)</span>
+                        </div>
+                    </div>
+                </form>
+                <div class="result" id="shoreline-result"></div>
+
+                <!-- 添加分隔线 -->
+                <hr class="section-divider">
+
+                <!-- 添加计算公式说明 -->
+                <div class="formula-section">
+                    <h3>◆ 计算公式</h3>
+                    <div class="formula-list">
+                        <div class="formula-item">
+                            <p>1. 岸线发育系数 (DL)</p>
+                            <div class="math">$$ DL = \frac{L}{2\sqrt{\pi A}} $$</div>
+                        </div>
+                        <div class="formula-item">
+                            <p>2. 分形维数 (FD)</p>
+                            <div class="math">$$ FD = \frac{2\ln L}{\ln A} $$</div>
+                        </div>
+                        <div class="formula-item">
+                            <p>3. 岸线密度 (D)</p>
+                            <div class="math">$$ D = \frac{L}{A} $$</div>
+                        </div>
+                        <div class="formula-item">
+                            <p>4. 岸线曲率 (C)</p>
+                            <div class="math">$$ C = \frac{L}{L_0} $$</div>
+                            <p class="formula-note">其中 L₀ 为湿地最长轴的长度</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 初始化变量
+        let charts = {};
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            // 初始化形状指数进度圈
+            charts.siProgressChart = initProgressChart('siProgress');
+            // 初始化岸线发育系数进度圈
+            charts.dlProgressChart = initProgressChart('dlProgress');
+            // 初始化岸线曲率进度圈
+            charts.curvatureProgressChart = initProgressChart('curvatureProgress');
+        });
+
+        // 初始化进度圈的通用函数
+        function initProgressChart(canvasId) {
+            const ctx = document.getElementById(canvasId);
+            if (ctx) {
+                return new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        datasets: [{
+                            data: [0, 100],
+                            backgroundColor: ['#f0f0f0', '#f0f0f0'],
+                            borderWidth: 0
+                        }]
+                    },
+                    options: {
+                        cutout: '80%',
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        rotation: 0,
+                        circumference: 360,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: { enabled: false }
+                        }
+                    }
+                });
+            }
+            return null;
+        }
+
+        // 更新形状指数进度圈
+        function updateSIProgress(si) {
+            const valueElement = document.getElementById('siValue');
+            const statusElement = document.getElementById('siStatus');
+            
+            if (!valueElement || !statusElement || !charts.siProgressChart) {
+                console.error('找不到必要的 DOM 元素');
+                return;
+            }
+            
+            const maxValue = 15;
+            const percentage = Math.min(si / maxValue * 100, 100);
+            
+            let color;
+            let statusText;
+            if (si <= 3) {
+                color = '#FF6B6B';
+                statusText = '形状指数较差';
+            } else if (si <= 6) {
+                color = '#FFA94D';
+                statusText = '形状指数中等';
+            } else {
+                color = '#51CF66';
+                statusText = '形状指数良好';
+            }
+            
+            charts.siProgressChart.data.datasets[0].data = [percentage, 100 - percentage];
+            charts.siProgressChart.data.datasets[0].backgroundColor = [color, '#f0f0f0'];
+            charts.siProgressChart.update();
+            
+            valueElement.textContent = si.toFixed(2);
+            statusElement.textContent = statusText;
+        }
+
+        // 更新岸线发育系数进度圈
+        function updateDLProgress(dl) {
+            const valueElement = document.getElementById('dlValue');
+            const statusElement = document.getElementById('dlStatus');
+            
+            if (!valueElement || !statusElement || !charts.dlProgressChart) {
+                console.error('找不到必要的 DOM 元素');
+                return;
+            }
+            
+            const maxValue = 12;
+            const percentage = Math.min(dl / maxValue * 100, 100);
+            
+            let color;
+            let statusText;
+            if (dl <= 3.8) {
+                color = '#FF6B6B';
+                statusText = '岸线发育系数较低';
+            } else if (dl <= 6) {
+                color = '#FFA94D';
+                statusText = '岸线发育系数中等';
+            } else {
+                color = '#51CF66';
+                statusText = '岸线发育系数良好';
+            }
+            
+            charts.dlProgressChart.data.datasets[0].data = [percentage, 100 - percentage];
+            charts.dlProgressChart.data.datasets[0].backgroundColor = [color, '#f0f0f0'];
+            charts.dlProgressChart.update();
+            
+            valueElement.textContent = dl.toFixed(2);
+            statusElement.textContent = statusText;
+        }
+
+        // 更新岸线曲率进度圈
+        function updateCurvatureProgress(c) {
+            const valueElement = document.getElementById('shorelineCurvature');
+            const statusElement = document.getElementById('curvatureStatus');
+            
+            if (!valueElement || !statusElement || !charts.curvatureProgressChart) {
+                console.error('找不到必要的 DOM 元素');
+                return;
+            }
+            
+            const maxValue = 10;
+            const percentage = Math.min(c / maxValue * 100, 100);
+            
+            let color;
+            let statusText;
+            if (c <= 4) {
+                color = '#FF6B6B';
+                statusText = '岸线曲率较低';
+            } else if (c <= 6.5) {
+                color = '#FFA94D';
+                statusText = '岸线曲率中等';
+            } else {
+                color = '#51CF66';
+                statusText = '岸线曲率良好';
+            }
+            
+            charts.curvatureProgressChart.data.datasets[0].data = [percentage, 100 - percentage];
+            charts.curvatureProgressChart.data.datasets[0].backgroundColor = [color, '#f0f0f0'];
+            charts.curvatureProgressChart.update();
+            
+            valueElement.textContent = c.toFixed(2);
+            statusElement.textContent = statusText;
+        }
+
+        // 切换显示不同的计算部分
+        function switchSection(sectionId) {
+            // 更新导航项的激活状态
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            event.currentTarget.classList.add('active');
+
+            // 更新内容区的显示
+            document.querySelectorAll('.section').forEach(section => {
+                section.classList.remove('active');
+            });
+            
+            // 更新标题
+            const headerTitle = document.querySelector('.header h1');
+            if (sectionId === 'shape-index') {
+                headerTitle.textContent = '形状指数计算';
+            } else if (sectionId === 'shoreline') {
+                headerTitle.textContent = '丰盈岸线计算';
+            }
+            
+            // 添加延迟以显示动画效果
+            setTimeout(() => {
+                document.getElementById(sectionId).classList.add('active');
+            }, 50);
+        }
+
+        // 形状指数计算
+        async function calculateShapeIndex() {
+            const form = document.getElementById('calculate_shape_index');
+            const resultDiv = document.getElementById('shape-index-result');
+            
+            try {
+                const formData = new FormData(form);
+                const params = new URLSearchParams();
+                
+                for (let [key, value] of formData.entries()) {
+                    if (value.trim() !== '') {
+                        params.append(key, value);
+                    }
+                }
+                
+                // 使用相对路径
+                const response = await fetch('/api/calculate_shape_index?' + params.toString());
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                
+                if (data.error) {
+                    resultDiv.innerHTML = `<div class="error">${data.error}</div>`;
+                    return;
+                }
+                
+                // 修改计算过程的显示格式
+                let output = "<div class='result'><div class='process-title'>计算过程</div><div class='steps'>";
+                if (data.steps) {
+                    // 根据不同的计算类型显示不同的公式
+                    if (data.P && data.A && data.SI) {
+                        output += `
+                            <div class="formula-item">
+                                <p>1. 代入公式：</p>
+                                <div class="math">$$ SI = \\frac{P}{2\\sqrt{\\pi A}} $$</div>
+                                <p>2. 将数值代入：</p>
+                                <div class="math">$$ SI = \\frac{${data.P}}{2\\sqrt{\\pi \\times ${data.A}}} $$</div>
+                                <p>3. 计算结果：</p>
+                                <div class="math">$$ SI = ${data.SI.toFixed(4)} $$</div>
+                            </div>
+                        `;
+                    } else if (data.SI && data.A && data.P) {
+                        output += `
+                            <div class="formula-item">
+                                <p>1. 代入公式：</p>
+                                <div class="math">$$ P = SI \\times 2\\sqrt{\\pi A} $$</div>
+                                <p>2. 将数值代入：</p>
+                                <div class="math">$$ P = ${data.SI} \\times 2\\sqrt{\\pi \\times ${data.A}} $$</div>
+                                <p>3. 计算结果：</p>
+                                <div class="math">$$ P = ${data.P.toFixed(2)} \\text{ 米} $$</div>
+                            </div>
+                        `;
+                    } else if (data.SI && data.P && data.A) {
+                        output += `
+                            <div class="formula-item">
+                                <p>1. 代入公式：</p>
+                                <div class="math">$$ A = \\left(\\frac{P}{2SI}\\right)^2 \\div \\pi $$</div>
+                                <p>2. 将数值代入：</p>
+                                <div class="math">$$ A = \\left(\\frac{${data.P}}{2 \\times ${data.SI}}\\right)^2 \\div \\pi $$</div>
+                                <p>3. 计算结果：</p>
+                                <div class="math">$$ A = ${data.A.toFixed(2)} \\text{ 平方米} $$</div>
+                            </div>
+                        `;
+                    }
+                }
+                output += "</div></div>";
+                
+                resultDiv.innerHTML = output;
+
+                // 需要重新渲染数学公式
+                if (window.MathJax) {
+                    MathJax.typesetPromise([resultDiv]);
+                }
+
+                // 更新指标卡片和输入框
+                if (data.SI) {
+                    // 更新进度圈和中心数值
+                    updateSIProgress(data.SI);
+                    // 更新输入框
+                    form.querySelector('input[name="SI"]').value = data.SI.toFixed(4);
+                }
+                if (data.P) {
+                    const perimeterElement = document.getElementById('perimeter');
+                    if (perimeterElement) {
+                        perimeterElement.textContent = data.P.toFixed(2);
+                    }
+                    // 更新输入框
+                    form.querySelector('input[name="P"]').value = data.P.toFixed(2);
+                }
+                if (data.A) {
+                    const areaElement = document.getElementById('area');
+                    if (areaElement) {
+                        areaElement.textContent = data.A.toFixed(2);
+                    }
+                    // 更新输入框
+                    form.querySelector('input[name="A"]').value = data.A.toFixed(2);
+                }
+                
+            } catch (error) {
+                console.error('计算错误:', error);
+                resultDiv.innerHTML = `<div class="error">计算出错：${error.message}</div>`;
+            }
+        }
+
+        // 丰盈岸线计算
+        async function calculateShoreline() {
+            const form = document.getElementById('calculate_rich_shoreline');
+            const resultDiv = document.getElementById('shoreline-result');
+            
+            try {
+                const formData = new FormData(form);
+                const params = new URLSearchParams();
+                
+                for (let [key, value] of formData.entries()) {
+                    if (value.trim() !== '') {
+                        params.append(key, value);
+                    }
+                }
+                
+                const response = await fetch('/api/calculate_rich_shoreline?' + params.toString());
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                
+                if (data.error) {
+                    resultDiv.innerHTML = `<div class="error">${data.error}</div>`;
+                    return;
+                }
+                
+                let output = "<div class='result'><div class='process-title'>计算过程</div><div class='steps'>";
+                if (data.steps) {
+                    data.steps.forEach(step => {
+                        switch(step.type) {
+                            case 'DL':
+                                output += `
+                                    <div class="calculation-step">
+                                        <h4>1. 岸线发育系数(DL)计算：</h4>
+                                        <div class="math">$$ DL = \\frac{L}{2\\sqrt{\\pi A}} $$</div>
+                                        <p>其中：</p>
+                                        <p>L = ${step.values.L} 米（岸线实际长度）</p>
+                                        <p>A = ${step.values.A} 平方米（面积）</p>
+                                        <p>计算结果：DL = ${step.result.toFixed(4)}</p>
+                                    </div>
+                                `;
+                                break;
+                            case 'FD':
+                                output += `
+                                    <div class="calculation-step">
+                                        <h4>2. 分形维数(FD)计算：</h4>
+                                        <div class="math">$$ FD = \\frac{2\\ln L}{\\ln A} $$</div>
+                                        <p>其中：</p>
+                                        <p>L = ${step.values.L} 米（岸线实际长度）</p>
+                                        <p>A = ${step.values.A} 平方米（面积）</p>
+                                        <p>计算结果：FD = ${step.result.toFixed(4)}</p>
+                                    </div>
+                                `;
+                                break;
+                            case 'D':
+                                output += `
+                                    <div class="calculation-step">
+                                        <h4>3. 岸线密度(D)计算：</h4>
+                                        <div class="math">$$ D = \\frac{L}{A} $$</div>
+                                        <p>其中：</p>
+                                        <p>L = ${step.values.L} 米（岸线实际长度）</p>
+                                        <p>A = ${step.values.A} 平方米（面积）</p>
+                                        <p>计算结果：D = ${step.result.toFixed(4)} m/m²</p>
+                                    </div>
+                                `;
+                                break;
+                            case 'C':
+                                output += `
+                                    <div class="calculation-step">
+                                        <h4>4. 岸线曲率(C)计算：</h4>
+                                        <div class="math">$$ C = \\frac{L}{L_0} $$</div>
+                                        <p>其中：</p>
+                                        <p>L = ${step.values.L} 米（岸线实际长度）</p>
+                                        <p>L₀ = ${step.values.L0} 米（最长轴长度）</p>
+                                        <p>计算结果：C = ${step.result.toFixed(4)}</p>
+                                    </div>
+                                `;
+                                break;
+                        }
+                    });
+                }
+                output += "</div></div>";
+                
+                resultDiv.innerHTML = output;
+
+                // 需要重新渲染数学公式
+                if (window.MathJax) {
+                    MathJax.typesetPromise([resultDiv]);
+                }
+                
+                // 更新指标卡片的值
+                if (data.DL) {
+                    updateDLProgress(data.DL);
+                }
+                if (data.FD) {
+                    document.getElementById('fractalDimension').textContent = data.FD.toFixed(4);
+                }
+                if (data.C) {
+                    updateCurvatureProgress(data.C);
+                }
+                if (data.D) {
+                    document.getElementById('shorelineDensity').textContent = data.D.toFixed(4) + ' m/m²';
+                }
+                
+            } catch (error) {
+                console.error('计算错误:', error);
+                resultDiv.innerHTML = `<div class="error">计算出错：${error.message}</div>`;
+            }
+        }
+    </script>
+</body>
+</html>
